@@ -27,6 +27,16 @@ module.exports = (sequelize, DataTypes) => {
         walletId: {
             type: DataTypes.STRING,
         },
+        sender: {
+            type: DataTypes.STRING,
+        },
+        receiver: {
+            type: DataTypes.STRING,
+        },
+        sessionId: {
+            type: DataTypes.STRING,
+            unique: true
+        },
         transactionId: {
             type: DataTypes.STRING,
             unique: true

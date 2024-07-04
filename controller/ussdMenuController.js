@@ -1,7 +1,7 @@
 const express = require('express');
 // const User = require("../database/models/User");
-const { User, UssdMenu } = require("../database/models")
-const { validatePhoneNumber, checkAccountBalance, uba2ubaTransfer } = require('../services/ubaServices');
+const { User, UssdMenu, Transaction } = require("../database/models")
+const { validateAccountNumber, checkAccountBalance, uba2ubaTransfer } = require('../services/ubaServices');
 const Sequelize = require('sequelize');
 const Op = Sequelize.Op;
 const crypto = require('crypto');
@@ -26,307 +26,322 @@ exports.moovReceiver = async (req, res, next) => {
     const lang = req.query.lang;
     const sc = req.query.sc;
 
-    //check if userInput is empty
-    if(userInput == ""){
-        //check if the user is enrolled for UBA USSD
-        const userExist = await checkUser(walletId, wallet="moov");
-        console.log("this is the userExist -->", userExist);
+    let isNumberSet = await checkPhoneNumber(walletId);
 
-        if(userExist == false){
-            //return the enrollment screen for the user
-            const welcomeScreenResp = await welcomeUser(walletId, lang, wallet="moov");
-            step = "0";
-            const insertUssdResp = await insertUssdAction(lang, wallet="moov", sessionId, walletId, closeState="0", welcomeScreenResp.questionType, step, welcomeScreenResp.text);
-            if(insertUssdResp == true){
-                res.header('Content-Type', 'application/xml');
-                res.status(200).send(welcomeScreenResp.text);
-            }
-        } else {
-            if(userInput == ""){
-                //display the index menu
-                const indexMenuResp = await indexMenu(walletId, lang, wallet="moov");
-                step = "1";
-                const insertUssdResp = await insertUssdAction(lang, wallet="moov", sessionId, walletId, closeState="0", indexMenuResp.questionType, step, indexMenuResp.text);
+    if(isNumberSet == true){
+        //check if userInput is empty
+        if(userInput == ""){
+            //check if the user is enrolled for UBA USSD
+            const userExist = await checkUser(walletId, wallet="moov");
+            console.log("this is the userExist -->", userExist);
+
+            if(userExist == false){
+                //return the enrollment screen for the user
+                const welcomeScreenResp = await welcomeUser(walletId, lang, wallet="moov");
+                step = "0";
+                const insertUssdResp = await insertUssdAction(lang, wallet="moov", sessionId, walletId, closeState="0", welcomeScreenResp.questionType, step, welcomeScreenResp.text);
                 if(insertUssdResp == true){
                     res.header('Content-Type', 'application/xml');
-                    res.status(200).send(indexMenuResp.text);
+                    res.status(200).send(welcomeScreenResp.text);
                 }
-            } else if(userInput == "1"){
-                // check if the user session is still active
-                const checkSession = await checkSessionId(walletId, sessionId);
-                //display the index menu
-                const indexMenuResp = await rechargeAirtime(walletId, lang, wallet="moov");
-                step = "1";
-                const insertUssdResp = await updateUssdAction(lang, wallet="moov", sessionId, walletId, closeState="0", indexMenuResp.questionType, step, indexMenuResp.text);
-                if(insertUssdResp == true){
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(indexMenuResp.text);
-                }
-            }
-        }
-    } else {
-        // check if the user session is still active
-        const checkSession = await checkSessionId(walletId, sessionId);
-        if(checkSession){
-            if(checkSession.questionType == "welcomeScreen"){
-                if(userInput == "1"){
-
-                    const enrollNewUserRep = await enrollNewUserScreen(walletId, lang, wallet="moov");
-                    step = "1";
-                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", enrollNewUserRep.questionType, step, enrollNewUserRep.text); 
-                    
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(enrollNewUserRep.text);
-                }
-                else if(userInput == "2"){
-                    resp = await cancelRequest(walletId, lang, wallet="moov");
-
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(resp.text);
-
-                } else {
-                    let info = "Invalid Request";
-                    resp = await error_messages(walletId, info, wallet="moov");
-                }
-            } else if(checkSession.questionType == "enrollUser"){
-                if(userInput == "1"){
-                    // if subscriber input is account we display a screen for account
-                    const enrollAccountNoResp = await enrollNewUserType(walletId, lang, wallet="moov", country="BJ", type="account");
-                    step = "1";
-                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", enrollAccountNoResp.questionType, step, enrollAccountNoResp.text); 
-                    
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(enrollAccountNoResp.text);
-                } else if(userInput == "2"){
-                    // if subscriber input is prepaid account we display screen for prepaid
-
-                    const enrollPrepaidNoResp = await enrollNewUserType(walletId, lang, wallet="moov", country="BJ", type="prepaid");
-                    step = "1";
-                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", enrollPrepaidNoResp.questionType, step, enrollPrepaidNoResp.text); 
-                    
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(enrollPrepaidNoResp.text);
-
-                } else if(userInput =="3") {
-                    const termsConditionResp = await TermsCondition(walletId, lang);
-                    step = "1";
-                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, step, indexMenuResp.text);
-                    if(insertUssdResp == true){
-                        res.header('Content-Type', 'application/xml');
-                        res.status(200).send(indexMenuResp.text);
-                    }
-                } else if(userInput =="4") {
-                    resp = await cancelRequest(walletId, lang, wallet="moov");
-
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(resp.text);
-                }
-            } else if(checkSession.questionType == "enrollUserAccount"){
-                if(checkSession.steps == "1"){
-                    // console.log("this is the account number --> ", subscriberInput)
-                    const enrollAccountNoResp = await enrollNewUserAccount(walletId, lang, wallet="moov", country="BJ", userInput);
-                    step = "2";
-                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", enrollAccountNoResp.questionType, step, enrollAccountNoResp.text); 
-                    
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(enrollAccountNoResp.text);
-                } else if (checkSession.steps == "2"){
-                    const confirmDetailsResp = await confirmEnrollDetails(walletId, lang, wallet="moov");
-                    if(confirmDetailsResp){
-                        step = "3";
-                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", confirmDetailsResp.questionType, step, confirmDetailsResp.text);
-                        
-                        res.header('Content-Type', 'application/xml');
-                        res.status(200).send(confirmDetailsResp.text);
-
-                    }
-                } else if(checkSession.steps == "3"){
-                    const createPinResp = await createNewPin(walletId, lang, wallet="moov", userInput);
-                    if(createPinResp){
-                        step = "1";
-                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", createPinResp.questionType, step, createPinResp.text);
-                        
-                        res.header('Content-Type', 'application/xml');
-                        res.status(200).send(createPinResp.text);
-
-                    }   
-                }
-            } else if(checkSession.questionType == "enrollUserPrepaid"){
-                if(checkSession.steps == "1"){
-                    const enrollPrepaidNoResp = await enrollNewUserPrepaid(walletId, lang, wallet="moov", country="BJ");
-                    step = "2";
-                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", enrollPrepaidNoResp.questionType, step, enrollPrepaidNoResp.text); 
-                    
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(enrollNewUserRep.text);
-
-                } else if (checkSession.steps == "2"){
-
-                }
-                
-            } else if(checkSession.questionType == "userCreated"){
-                if(userInput == "1"){
+            } else {
+                if(userInput == ""){
                     //display the index menu
                     const indexMenuResp = await indexMenu(walletId, lang, wallet="moov");
                     step = "1";
-                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, step, indexMenuResp.text); 
-                    
-                    console.log("indexMenuResp -->", indexMenuResp);
-                    console.log("this is the insertUssdResp -->", insertUssdResp);
+                    const insertUssdResp = await insertUssdAction(lang, wallet="moov", sessionId, walletId, closeState="0", indexMenuResp.questionType, step, indexMenuResp.text);
                     
                     if(insertUssdResp == true){
                         res.header('Content-Type', 'application/xml');
                         res.status(200).send(indexMenuResp.text);
                     }
-                } else {
 
-                }
-            } else if(checkSession.questionType == "indexScreen"){
-                if(userInput == "1"){
+
+                } else if(userInput == "1"){
                     // check if the user session is still active
                     const checkSession = await checkSessionId(walletId, sessionId);
                     //display the index menu
                     const indexMenuResp = await rechargeAirtime(walletId, lang, wallet="moov");
                     step = "1";
-                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, step, indexMenuResp.text);
+                    const insertUssdResp = await updateUssdAction(lang, wallet="moov", sessionId, walletId, closeState="0", indexMenuResp.questionType, step, indexMenuResp.text);
                     if(insertUssdResp == true){
                         res.header('Content-Type', 'application/xml');
                         res.status(200).send(indexMenuResp.text);
                     }
-                } else if(userInput == "2"){
-                    // check if the user session is still active
-                    const checkSession = await checkSessionId(walletId, sessionId);
-                    //display the index menu
-                    const indexMenuResp = await ubaToUbaTransfer(walletId, lang, wallet="moov", checkSession.steps, userInput);
-                    step = "1";
-                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, indexMenuResp.step, indexMenuResp.text);
-                    if(insertUssdResp == true){
-                        res.header('Content-Type', 'application/xml');
-                        res.status(200).send(indexMenuResp.text);
-                    }
-                } else if(userInput == "3"){
-                    //display the index menu
-                    const indexMenuResp = await prepaidCardLoading(walletId, lang, wallet="moov", checkSession.steps, userInput);
-                    //update USSD action
-                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, indexMenuResp.step, indexMenuResp.text);
-                    if(insertUssdResp == true){
-                        res.header('Content-Type', 'application/xml');
-                        res.status(200).send(indexMenuResp.text);
-                    }
-                } else if(userInput == "4"){
-                    
-                    //display the index menu
-                    const indexMenuResp = await achTransfer(walletId, lang, wallet="moov", checkSession.steps, userInput);
-                    //update USSD action
-                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, indexMenuResp.step, indexMenuResp.text);
-                    if(insertUssdResp == true){
-                        res.header('Content-Type', 'application/xml');
-                        res.status(200).send(indexMenuResp.text);
-                    }
-                } else if(userInput == "5"){
-                    //display the index menu
-                    const indexMenuResp = await miniStatement(walletId, lang, wallet="mtn", checkSession.steps, userInput);
-                    //update USSD action
-                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState, indexMenuResp.questionType, indexMenuResp.step, indexMenuResp.text);
-                    if(insertUssdResp == true){
-                        res.header('Content-Type', 'application/xml');
-                        res.status(200).send(indexMenuResp.text);
-                    }
-                    //const insertUssdResp = await
-                } else if(userInput == "6"){
-
-                    //display the index menu
-                    const indexMenuResp = await checkBalance(walletId, lang, wallet="moov", checkSession.steps, userInput);
-
-                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, indexMenuResp.step, indexMenuResp.text);
-                    if(insertUssdResp == true){
-                        res.header('Content-Type', 'application/xml');
-                        res.status(200).send(indexMenuResp.text);
-                    }
-                    //const insertUssdResp = await
-                } else if(userInput == "7"){
-                    //display the index menu
-                    const indexMenuResp = await pushPullAutoLinkage(walletId, lang, wallet="moov");
-                    //update USSD action
-                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, indexMenuResp.step, indexMenuResp.text);
-                    if(insertUssdResp == true){
-                        res.header('Content-Type', 'application/xml');
-                        res.status(200).send(indexMenuResp.text);
-                    }
-                    //const insertUssdResp = await
                 }
-            } else if(checkSession.questionType =="checkBalance"){
-                const checkBalanceResp = await checkBalance(walletId, lang, wallet="moov", checkSession.steps, userInput);
-
-                const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="1", checkBalanceResp.questionType, checkBalanceResp.step, checkBalanceResp.text);
-                if(insertUssdResp == true){
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(checkBalanceResp.text);
-                }
-            } else if(checkSession.questionType=="prepaidCardLoading"){
-                const prepaidCardLoadingResp = await prepaidCardLoading(walletId, lang, wallet="moov", checkSession.steps, userInput);
-
-                const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="1", prepaidCardLoadingResp.questionType, prepaidCardLoadingResp.step, prepaidCardLoadingResp.text);
-                if(insertUssdResp == true){
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(prepaidCardLoadingResp.text);
-                }
-
-            } else if(checkSession.questionType=="achTransfer"){    
-                const achTransferResp = await achTransfer(walletId, lang, wallet="moov", checkSession.steps, userInput);
-
-                const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="1", achTransferResp.questionType, achTransferResp.step, achTransferResp.text);   
-                if(insertUssdResp == true){
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(achTransferResp.text);
-                }
-
-            } else if(checkSession.questionType="pushPullAutoLinkage"){
-                const pushPullAutoLinkageResp = await pushPullAutoLinkage(walletId, lang, wallet="moov", checkSession.steps, userInput);
-                
-                const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="1", pushPullAutoLinkageResp.questionType, pushPullAutoLinkageResp.step, pushPullAutoLinkageResp.text);
-                if(insertUssdResp == true){
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(pushPullAutoLinkageResp.text);
-                }
-
-            } else if(checkSession.questionType="miniStatement"){
-
-                const miniStatementResp = await miniStatement(walletId, lang, wallet="moov", checkSession.steps, userInput);
-
-                const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="1", miniStatementResp.questionType, miniStatementResp.step, miniStatementResp.text); 
-                if(insertUssdResp == true){
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(miniStatementResp.text);
-                }
-
-            } else if(checkSession.questionType="ubaToUbaTransfer"){
-                const ubaToUbaTransferResp = await ubaToUbaTransfer(walletId, lang, wallet="moov", checkSession.steps, userInput);
-
-                const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="1", ubaToUbaTransferResp.questionType, ubaToUbaTransferResp.step, ubaToUbaTransferResp.text);
-                if(insertUssdResp == true){
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(ubaToUbaTransferResp.text);
-                }
-
-            } else if(checkSession.questionType="rechargeAirtime"){
-                const rechargeAirtimeResp = await rechargeAirtime(walletId, lang, wallet="moov", checkSession.steps, userInput);
-
-                const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="1", rechargeAirtimeResp.questionType, rechargeAirtimeResp.step, rechargeAirtimeResp.text);
-                if(insertUssdResp == true){
-                    res.header('Content-Type', 'application/xml');
-                    res.status(200).send(rechargeAirtimeResp.text);
-                }
-
             }
         } else {
-            let info = "Invalid Request, Try again";
-            resp = await error_messages(walletId, info, wallet="moov");
+            // check if the user session is still active
+            const checkSession = await checkSessionId(walletId, sessionId);
+            if(checkSession){
+                if(checkSession.questionType == "welcomeScreen"){
+                    if(userInput == "1"){
 
-            res.header('Content-Type', 'application/xml');
-            res.status(200).send(resp.text);
-        
+                        const enrollNewUserRep = await enrollNewUserScreen(walletId, lang, wallet="moov");
+                        step = "1";
+                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", enrollNewUserRep.questionType, step, enrollNewUserRep.text); 
+                        
+                        res.header('Content-Type', 'application/xml');
+                        res.status(200).send(enrollNewUserRep.text);
+                    }
+                    else if(userInput == "2"){
+                        resp = await cancelRequest(walletId, lang, wallet="moov");
+
+                        res.header('Content-Type', 'application/xml');
+                        res.status(200).send(resp.text);
+
+                    } else {
+                        let info = "Invalid Request";
+                        resp = await error_messages(walletId, info, wallet="moov");
+                    }
+                } else if(checkSession.questionType == "enrollUser"){
+                    if(userInput == "1"){
+                        // if subscriber input is account we display a screen for account
+                        const enrollAccountNoResp = await enrollNewUserType(walletId, lang, wallet="moov", country="BJ", type="account");
+                        step = "1";
+                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", enrollAccountNoResp.questionType, step, enrollAccountNoResp.text); 
+                        
+                        res.header('Content-Type', 'application/xml');
+                        res.status(200).send(enrollAccountNoResp.text);
+                    } else if(userInput == "2"){
+                        // if subscriber input is prepaid account we display screen for prepaid
+
+                        const enrollPrepaidNoResp = await enrollNewUserType(walletId, lang, wallet="moov", country="BJ", type="prepaid");
+                        step = "1";
+                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", enrollPrepaidNoResp.questionType, step, enrollPrepaidNoResp.text); 
+                        
+                        res.header('Content-Type', 'application/xml');
+                        res.status(200).send(enrollPrepaidNoResp.text);
+
+                    } else if(userInput =="3") {
+                        const termsConditionResp = await TermsCondition(walletId, lang);
+                        step = "1";
+                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, step, indexMenuResp.text);
+                        if(insertUssdResp == true){
+                            res.header('Content-Type', 'application/xml');
+                            res.status(200).send(indexMenuResp.text);
+                        }
+                    } else if(userInput =="4") {
+                        resp = await cancelRequest(walletId, lang, wallet="moov");
+
+                        res.header('Content-Type', 'application/xml');
+                        res.status(200).send(resp.text);
+                    }
+                } else if(checkSession.questionType == "enrollUserAccount"){
+                    if(checkSession.steps == "1"){
+                        // console.log("this is the account number --> ", subscriberInput)
+                        const enrollAccountNoResp = await enrollNewUserAccount(walletId, lang, wallet="moov", country="BJ", userInput);
+                        step = "2";
+                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", enrollAccountNoResp.questionType, step, enrollAccountNoResp.text); 
+                        
+                        res.header('Content-Type', 'application/xml');
+                        res.status(200).send(enrollAccountNoResp.text);
+                    } else if (checkSession.steps == "2"){
+                        const confirmDetailsResp = await confirmEnrollDetails(walletId, lang, wallet="moov");
+                        if(confirmDetailsResp){
+                            step = "3";
+                            const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", confirmDetailsResp.questionType, step, confirmDetailsResp.text);
+                            
+                            res.header('Content-Type', 'application/xml');
+                            res.status(200).send(confirmDetailsResp.text);
+
+                        }
+                    } else if(checkSession.steps == "3"){
+                        const createPinResp = await createNewPin(walletId, lang, wallet="moov", userInput);
+                        if(createPinResp){
+                            step = "1";
+                            const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", createPinResp.questionType, step, createPinResp.text);
+                            
+                            res.header('Content-Type', 'application/xml');
+                            res.status(200).send(createPinResp.text);
+
+                        }   
+                    }
+                } else if(checkSession.questionType == "enrollUserPrepaid"){
+                    if(checkSession.steps == "1"){
+                        const enrollPrepaidNoResp = await enrollNewUserPrepaid(walletId, lang, wallet="moov", country="BJ");
+                        step = "2";
+                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", enrollPrepaidNoResp.questionType, step, enrollPrepaidNoResp.text); 
+                        
+                        res.header('Content-Type', 'application/xml');
+                        res.status(200).send(enrollNewUserRep.text);
+
+                    } else if (checkSession.steps == "2"){
+
+                    }
+                    
+                } else if(checkSession.questionType == "userCreated"){
+                    if(userInput == "1"){
+                        //display the index menu
+                        const indexMenuResp = await indexMenu(walletId, lang, wallet="moov");
+                        step = "1";
+                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, step, indexMenuResp.text); 
+                        
+                        console.log("indexMenuResp -->", indexMenuResp);
+                        console.log("this is the insertUssdResp -->", insertUssdResp);
+                        
+                        if(insertUssdResp == true){
+                            res.header('Content-Type', 'application/xml');
+                            res.status(200).send(indexMenuResp.text);
+                        }
+                    } else {
+
+                    }
+                } else if(checkSession.questionType == "indexScreen"){
+                    if(userInput == "1"){
+                        // check if the user session is still active
+                        const checkSession = await checkSessionId(walletId, sessionId);
+                        //display the index menu
+                        const indexMenuResp = await rechargeAirtime(walletId, lang, wallet="moov");
+                        step = "1";
+                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, step, indexMenuResp.text);
+                        if(insertUssdResp == true){
+                            res.header('Content-Type', 'application/xml');
+                            res.status(200).send(indexMenuResp.text);
+                        }
+                    } else if(userInput == "2"){
+                        // check if the user session is still active
+                        const checkSession = await checkSessionId(walletId, sessionId);
+                        //display the index menu
+                        const indexMenuResp = await ubaToUbaTransfer(sessionId, walletId, lang, wallet="moov", checkSession.steps, userInput);
+                        step = "1";
+                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, indexMenuResp.step, indexMenuResp.text);
+                        if(insertUssdResp == true){
+                            res.header('Content-Type', 'application/xml');
+                            res.status(200).send(indexMenuResp.text);
+                        }
+                    } else if(userInput == "3"){
+                        //display the index menu
+                        const indexMenuResp = await prepaidCardLoading(walletId, lang, wallet="moov", checkSession.steps, userInput);
+                        //update USSD action
+                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, indexMenuResp.step, indexMenuResp.text);
+                        if(insertUssdResp == true){
+                            res.header('Content-Type', 'application/xml');
+                            res.status(200).send(indexMenuResp.text);
+                        }
+                    } else if(userInput == "4"){
+                        
+                        //display the index menu
+                        const indexMenuResp = await achTransfer(walletId, lang, wallet="moov", checkSession.steps, userInput);
+                        //update USSD action
+                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, indexMenuResp.step, indexMenuResp.text);
+                        if(insertUssdResp == true){
+                            res.header('Content-Type', 'application/xml');
+                            res.status(200).send(indexMenuResp.text);
+                        }
+                    } else if(userInput == "5"){
+                        //display the index menu
+                        const indexMenuResp = await miniStatement(walletId, lang, wallet="mtn", checkSession.steps, userInput);
+                        //update USSD action
+                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState, indexMenuResp.questionType, indexMenuResp.step, indexMenuResp.text);
+                        if(insertUssdResp == true){
+                            res.header('Content-Type', 'application/xml');
+                            res.status(200).send(indexMenuResp.text);
+                        }
+                        //const insertUssdResp = await
+                    } else if(userInput == "6"){
+
+                        //display the index menu
+                        const indexMenuResp = await checkBalance(walletId, lang, wallet="moov", checkSession.steps, userInput);
+
+                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, indexMenuResp.step, indexMenuResp.text);
+                        if(insertUssdResp == true){
+                            res.header('Content-Type', 'application/xml');
+                            res.status(200).send(indexMenuResp.text);
+                        }
+                        //const insertUssdResp = await
+                    } else if(userInput == "7"){
+                        //display the index menu
+                        const indexMenuResp = await pushPullAutoLinkage(walletId, lang, wallet="moov");
+                        //update USSD action
+                        const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="0", indexMenuResp.questionType, indexMenuResp.step, indexMenuResp.text);
+                        if(insertUssdResp == true){
+                            res.header('Content-Type', 'application/xml');
+                            res.status(200).send(indexMenuResp.text);
+                        }
+                        //const insertUssdResp = await
+                    }
+                } else if(checkSession.questionType == "checkBalance"){
+                    const checkBalanceResp = await checkBalance(walletId, lang, wallet="moov", checkSession.steps, userInput);
+
+                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="1", checkBalanceResp.questionType, checkBalanceResp.step, checkBalanceResp.text);
+                    if(insertUssdResp == true){
+                        res.header('Content-Type', 'application/xml');
+                        res.status(200).send(checkBalanceResp.text);
+                    }
+                } else if(checkSession.questionType == "prepaidCardLoading"){
+                    const prepaidCardLoadingResp = await prepaidCardLoading(walletId, lang, wallet="moov", checkSession.steps, userInput);
+
+                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="1", prepaidCardLoadingResp.questionType, prepaidCardLoadingResp.step, prepaidCardLoadingResp.text);
+                    if(insertUssdResp == true){
+                        res.header('Content-Type', 'application/xml');
+                        res.status(200).send(prepaidCardLoadingResp.text);
+                    }
+
+                } else if(checkSession.questionType == "achTransfer"){    
+                    const achTransferResp = await achTransfer(walletId, lang, wallet="moov", checkSession.steps, userInput);
+
+                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="1", achTransferResp.questionType, achTransferResp.step, achTransferResp.text);   
+                    if(insertUssdResp == true){
+                        res.header('Content-Type', 'application/xml');
+                        res.status(200).send(achTransferResp.text);
+                    }
+
+                } else if(checkSession.questionType == "pushPullAutoLinkage"){
+                    const pushPullAutoLinkageResp = await pushPullAutoLinkage(walletId, lang, wallet="moov", checkSession.steps, userInput);
+                    
+                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="1", pushPullAutoLinkageResp.questionType, pushPullAutoLinkageResp.step, pushPullAutoLinkageResp.text);
+                    if(insertUssdResp == true){
+                        res.header('Content-Type', 'application/xml');
+                        res.status(200).send(pushPullAutoLinkageResp.text);
+                    }
+
+                } else if(checkSession.questionType == "miniStatement"){
+
+                    const miniStatementResp = await miniStatement(walletId, lang, wallet="moov", checkSession.steps, userInput);
+
+                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="1", miniStatementResp.questionType, miniStatementResp.step, miniStatementResp.text); 
+                    if(insertUssdResp == true){
+                        res.header('Content-Type', 'application/xml');
+                        res.status(200).send(miniStatementResp.text);
+                    }
+
+                } else if(checkSession.questionType == "ubaToUbaTransfer"){
+                    const ubaToUbaTransferResp = await ubaToUbaTransfer(sessionId, walletId, lang, wallet="moov", checkSession.steps, userInput);
+
+                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="1", ubaToUbaTransferResp.questionType, ubaToUbaTransferResp.step, ubaToUbaTransferResp.text);
+                    if(insertUssdResp == true){
+                        res.header('Content-Type', 'application/xml');
+                        res.status(200).send(ubaToUbaTransferResp.text);
+                    }
+
+                } else if(checkSession.questionType == "rechargeAirtime"){
+                    const rechargeAirtimeResp = await rechargeAirtime(walletId, lang, wallet="moov", checkSession.steps, userInput);
+
+                    const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState="1", rechargeAirtimeResp.questionType, rechargeAirtimeResp.step, rechargeAirtimeResp.text);
+                    if(insertUssdResp == true){
+                        res.header('Content-Type', 'application/xml');
+                        res.status(200).send(rechargeAirtimeResp.text);
+                    }
+
+                }
+            } else {
+                
+                let info = "Invalid Request, Try again";
+                resp = await error_messages(walletId, info, wallet="moov");
+
+                res.header('Content-Type', 'application/xml');
+                res.status(200).send(resp.text);
+
+            }
         }
+
+    } else {
+        let info = "Travaux en cours, revenez plus tard.";
+        resp = await error_messages(walletId, info, wallet="moov");
+
+        res.header('Content-Type', 'application/xml');
+        res.status(200).send(resp.text);
     }
 };
 
@@ -547,7 +562,7 @@ exports.mtnReceiver = async (req, res, next) => {
                     // check if the user session is still active
                     const checkSession = await checkSessionId(walletId, sessionId);
                     //display the index menu
-                    const indexMenuResp = await ubaToUbaTransfer(walletId, lang, wallet="mtn", checkSession.steps, subscriberInput);
+                    const indexMenuResp = await ubaToUbaTransfer(sessionId, walletId, lang, wallet="mtn", checkSession.steps, subscriberInput);
                     step = "1";
                     const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState, indexMenuResp.questionType, indexMenuResp.step, indexMenuResp.text);
                     if(insertUssdResp == true){
@@ -657,7 +672,7 @@ exports.mtnReceiver = async (req, res, next) => {
 
             }
             else if(checkSession.questionType=="ubaToUbaTransfer"){
-                const ubaToUbaTransferResp = await ubaToUbaTransfer(walletId, lang, wallet="mtn", checkSession.steps, subscriberInput);
+                const ubaToUbaTransferResp = await ubaToUbaTransfer(sessionId, walletId, lang, wallet="mtn", checkSession.steps, subscriberInput);
 
                 const insertUssdResp = await updateUssdAction(sessionId, walletId, closeState, ubaToUbaTransferResp.questionType, ubaToUbaTransferResp.step, ubaToUbaTransferResp.text);
                 if(insertUssdResp == true){
@@ -796,7 +811,7 @@ const cancelRequest = async(walletId, lang, wallet) => {
     return res;
 };
 
-// generate a documentation for the function error_messages
+
 /**
  * @function error_messages
  * @param {string} walletId - The walletId of the user
@@ -866,18 +881,36 @@ const buildResponseTextClose = async(walletId, info, wallet) => {
 const indexMenu = async (walletId, lang, wallet) => {
     let info = "";
     if(lang == "en"){
-        info = "\n1. Airtime Topup.\n2. UBA to UBA Transfer \n3. Prepaid Card Loading \n4. ACH Transfer\n5. Mini Statement \n6. Check Balance \n7. Push & Pull Auto Linkage MTN, Moov and B-Mo \n"
-    } else if(lang == "fr") {
-        info = "\n1. Recharge de temps d'antenne.\n2. Transfert UBA vers UBA \n3. Chargement de la carte prépayée \n4. Transfert ACH\n5. Mini-déclaration \n6. Vérifier le solde \n7. Liaison automatique Push & Pull MTN, Moov et B-Mo \n"
+        info = "\n1. Airtime Topup.\n2. UBA to UBA Transfer \n3. Prepaid Card Loading \n4. ACH Transfer\n5. Mini Statement \n6. Check Balance \n7.Push & Pull Auto Linkage MTN, Moov and B-Mo \n8. Fund Mobile Wallet \n9.Cardless Withdrawal \n10.  Next \n"
+        //info = "\nWelcome to UBA USSD Banking.\nPlease note a network charge will be applied to your account for banking services on this channel. \n1. Accept \n2. Cancel\n"
+    } else {
+        info = "\n1. Recharge de temps de antenne.\n2. Transfert UBA vers UBA \n3. Chargement de la carte prépayée \n4. Transfert ACH\n5. Mini-déclaration \n6. Vérifier le solde \n7.Liaison automatique Push & Pull MTN, Moov et B-Mo \n8. Retrait GAB \n"
+        //info = "\nBienvenue sur UBA USSD Banking.\nVeuillez noter que des frais de réseau de seront appliqués à votre compte pour les services bancaires sur ce canal. \n1. Acceptez \n2. Annuler\n"
     }
 
     const text = await buildResponseText(walletId, info, wallet);
-    console.log("this is the text -->", text);
     const questionType = 'indexScreen';
     const res = { text, questionType }
     return res;
-
 };
+
+// const indexMenu = async (walletId, lang, wallet) => {
+//     let info = "";
+//     if(lang == "en"){
+//         info ="\nWelcome to UBA USSD Banking, You have Successfully Enrolled \n"
+//         //info = "\n1. Airtime Topup.\n2. UBA to UBA Transfer \n3. Prepaid Card Loading \n4. ACH Transfer\n5. Mini Statement \n6. Check Balance \n7. Next \n"
+//     } else if(lang == "fr") {
+//         info ="\nBienvenue chez UBA USSD Banking, vous vous êtes inscrit avec succès \n"
+//         //info = "\n1. Recharge de temps de antenne.\n2. Transfert UBA vers UBA \n3. Chargement de la carte prépayée \n4. Transfert ACH\n5. Mini-déclaration \n6. Vérifier le solde \n7. Suivant \n"
+//     }
+
+//     const text = await buildResponseText(walletId, info, wallet);
+//     // console.log("this is the text -->", text);
+//     const questionType = 'indexScreen';
+//     const res = { text, questionType }
+//     return res;
+
+// };
  
 /**
  * @function insertUssdAction
@@ -1004,21 +1037,21 @@ const buildResponseText = async(walletId, info, wallet) => {
  */
 const enrollNewUserAccount = async(walletId, lang, wallet, country, account) => {
 
-    //const validate = await validatePhoneNumber(walletId, country, account);
-    let mockResponse = {
-        "status": "success",
-        "fullname": "John Doe",
-        "phonenumber": walletId
-    };
-    if(mockResponse.status == "success"){
+    const validate = await validateAccountNumber(walletId, country="BENIN-REPUBLIC", account);
+
+    console.log("this is the response from UBA ESB --->", validate);
+
+    let fullName = validate.data.accountInfo.accountName;
+
+    if(validate.status == true){
         let info = "";
         if(lang == "en"){
-            info = `\n ${mockResponse.fullname} \n1. Confirm Details\n 2. Cancel\n`
+            info = `\n ${fullName} \n1. Confirm Details\n 2. Cancel\n`
         } else {
-            info = `\n ${mockResponse.fullname} \n1. Veuillez entrer votre numéro de compte\n 2. Annuler\n`
+            info = `\n ${fullName} \n1. Veuillez entrer votre numéro de compte\n 2. Annuler\n`
         }
 
-        const insertAccount = await insertNewUser(walletId, wallet, country, type="account", mockResponse.fullname, account);
+        const insertAccount = await insertNewUser(walletId, wallet, country, type="account", fullName, account);
         if(insertAccount == true){
             const text = await buildResponseText(walletId, info, wallet);
             const questionType = 'enrollUserAccount';
@@ -1201,9 +1234,9 @@ const createNewPin = async(walletId, lang, wallet, userInput) => {
 
     if(updateUser){
         if(lang == "en"){
-            info = "\nYour Pin has been successfully created\n 1. Go to Main Menu\n 2. Cancel\n"
+            info = "\nAccount Enrollment Success!!! \nYour Pin has been successfully created\n 1. Go to Main Menu\n 2. Cancel\n"
         } else {
-            info = "\nVotre épingle a été créée avec succès\n 1. Aller au menu principal\n 2. Annuler\n"
+            info = "\nInscription du compte réussie !!! \nVotre épingle a été créée avec succès\n 1. Aller au menu principal\n 2. Annuler\n"
         }
 
         const text = await buildResponseText(walletId, info, wallet);
@@ -1223,7 +1256,6 @@ const encryptPin = async(pin) => {
 
     return hashedPin;
 };
-
 
 
 // generate a function to decrypt the pin using sha256 algorithm
@@ -1253,7 +1285,7 @@ const verifyPin = async(walletId, pin) => {
     
 }
 
-const ubaToUbaTransfer = async(walletId, lang, wallet, step, subscriberInput) => {
+const ubaToUbaTransfer = async(sessionId, walletId, lang, wallet, step, subscriberInput) => {
 
     if(step == "1"){
 
@@ -1265,7 +1297,8 @@ const ubaToUbaTransfer = async(walletId, lang, wallet, step, subscriberInput) =>
         }
 
         let step = "2";
-
+        
+        console.log("I am requesting to check the PIN");
         const text = await buildResponseText(walletId, info, wallet);
         const questionType = 'ubaToUbaTransfer';
         const res = { text, questionType, step }
@@ -1277,6 +1310,8 @@ const ubaToUbaTransfer = async(walletId, lang, wallet, step, subscriberInput) =>
 
         const pinCheck = await verifyPin(walletId, subscriberInput);
 
+        console.log("I am verifying the PIN. This is the PIN status --->", pinCheck);
+
         if(pinCheck == true){
 
             let info = "";
@@ -1285,6 +1320,8 @@ const ubaToUbaTransfer = async(walletId, lang, wallet, step, subscriberInput) =>
             } else {
                 info = "\nVeuillez saisir le numéro de compte du destinataire \n 0. pour annuler\n"
             }
+
+            console.log("I am requesting for the account number --->");
 
             let step = "3";
 
@@ -1309,6 +1346,14 @@ const ubaToUbaTransfer = async(walletId, lang, wallet, step, subscriberInput) =>
         }
 
     } else if(step == "3"){
+
+        console.log("I got the customer account number here -->", subscriberInput);
+
+        const getWallet = await getWalletDetails(walletId);
+
+        let sender = getWallet.accountNumber;
+
+        initiateTransaction(sender, subscriberInput, walletId, currency="XOF", transStatus="processing", type="bank", sessionId);
         
         let info = "";
         if(lang == "en"){
@@ -1319,6 +1364,8 @@ const ubaToUbaTransfer = async(walletId, lang, wallet, step, subscriberInput) =>
 
         let step = "4";
 
+        console.log("I am entering the amount to transfer");
+
         const text = await buildResponseText(walletId, info, wallet);
         const questionType = 'ubaToUbaTransfer';
         const res = { text, questionType, step }
@@ -1326,15 +1373,24 @@ const ubaToUbaTransfer = async(walletId, lang, wallet, step, subscriberInput) =>
 
     } else if(step == "4"){
 
-        const transferResp = await uba2ubaTransfer(amount, sender, receiver, walletId, country="BENIN");
+        const getTransDetails = await getTransactionDetails(sessionId);
 
-        if(transferResp.status == true){
+        console.log("transaction details here -->", getTransDetails)
+
+        const transferResp = await uba2ubaTransfer(subscriberInput, getTransDetails.sender, getTransDetails.receiver, walletId, country="BENIN-REPUBLIC", getTransDetails.transactionId);
+
+        if(transferResp.data.status == true){
+
+            completeTransaction(sessionId, walletId, getTransDetails.transactionId, subscriberInput, transStatus="success", statusCode="000", statusMessage="Transaction Successful")
+
             let info = "";
             if(lang == "en"){
-                info = `\nTransfer of ${amount} to ${receiver} was successful \n 0. to Cancel\n`
+                info = `\nTransfer of ${subscriberInput} XOF to ${getTransDetails.receiver} was successful \n 0. to Cancel\n`
             } else {
-                info = `\nLe transfert de ${amount} à ${receiver} a été un succès \n 0. pour annuler\n`
+                info = `\nLe transfert de ${subscriberInput} XOF à ${getTransDetails.receiver} a été un succès \n 0. pour annuler\n`
             }
+
+            console.log("Money sent successfully");
 
             const text = await buildResponseText(walletId, info, wallet);
             const questionType = 'ubaToUbaTransfer';
@@ -1343,10 +1399,12 @@ const ubaToUbaTransfer = async(walletId, lang, wallet, step, subscriberInput) =>
         } else {
             let info = "";
             if(lang == "en"){
-                info = `\nTransfer of ${amount} to ${receiver} was not successful, Try Again. \n`
+                info = `\nTransfer of ${subscriberInput} to ${getTransDetails.receiver} was not successful, Try Again. \n`
             } else {
-                info = `\nLe transfert de ${amount} à ${receiver} n'a pas été un succès, Essayer à nouveau  \n`
+                info = `\nLe transfert de ${subscriberInput} à ${getTransDetails.receiver} n'a pas été un succès, Essayer à nouveau  \n`
             }
+
+            console.log("Could not send Money");
             
             const text = await buildResponseTextClose(walletId, info, wallet);
             const questionType = 'ubaToUbaTransfer';
@@ -1386,19 +1444,22 @@ const checkBalance = async(walletId, lang, wallet, step, subscriberInput) => {
         if(pinCheck == true){
 
             // get account number from the user table
-            //const getWallet = await getWalletDetails(walletId);
+            const getWallet = await getWalletDetails(walletId);
 
-            /*
                 if(getWallet != false){
 
                     let account = getWallet.accountNumber;
 
+                    console.log("this is the account number -->", account);
+
                     // get customer account balance 
 
-                    const checkBal = await checkAccountBalance(account);
+                    const checkBal = await checkAccountBalance(account, country="BENIN-REPUBLIC");
 
-                    if(checkBal.status == "success"){
-                        let amount = checkBal.amount;
+                    if(checkBal.data.status == true){
+                        let amount = parseInt(checkBal.data.availableBalance);
+
+                        console.log("this is the available balance", amount);
 
                         let step = "3"
 
@@ -1416,9 +1477,9 @@ const checkBalance = async(walletId, lang, wallet, step, subscriberInput) => {
                     } else {
                         let info = "";
                         if(lang == "en"){
-                            info = "\nInvalid Account Number\n"
+                            info = "\nBalance Enquiry Failed, Try Again Later\n"
                         } else {
-                            info = "\nNuméro de compte invalide\n"
+                            info = "\nÉchec de la demande de solde, réessayez plus tard.\n"
                         }
 
                         const text = await buildResponseTextClose(walletId, info, wallet);
@@ -1427,23 +1488,23 @@ const checkBalance = async(walletId, lang, wallet, step, subscriberInput) => {
                         return res;
                     }
                 } 
-            */
+            
 
-            let amount = "50000";
+            // let amount = "50000";
 
-            let step = "3"
+            // let step = "3"
 
-            let info = "";
-            if(lang == "en"){
-                info = `\nYour Account Balance is ${amount} XOF \n 0. to Cancel\n`
-            } else {
-                info = `\nLe solde de notre compte est ${amount} XOF \n 0. pour annuler\n`
-            }
+            // let info = "";
+            // if(lang == "en"){
+            //     info = `\nYour Account Balance is ${amount} XOF \n 0. to Cancel\n`
+            // } else {
+            //     info = `\nLe solde de notre compte est ${amount} XOF \n 0. pour annuler\n`
+            // }
 
-            const text = await buildResponseText(walletId, info, wallet);
-            const questionType = 'checkBalance';
-            const res = { text, questionType, step }
-            return res;
+            // const text = await buildResponseText(walletId, info, wallet);
+            // const questionType = 'checkBalance';
+            // const res = { text, questionType, step }
+            // return res;
 
         } else {
             let info = "";
@@ -1497,5 +1558,102 @@ const getWalletDetails = async(walletId) => {
     }
 }
 
+const getTransactionDetails = async(sessionId) => {
 
-//
+    const getTransaction = await Transaction.findOne({ where: { sessionId: sessionId } });
+
+    if(getTransaction){
+        return getTransaction.dataValues;
+    } else {
+        return false;
+    }
+}
+
+
+const checkPhoneNumber = async(walletId) => {
+
+    const arrayNumber = [ "2294792712", "22995521010", "2294792799", "22995228720", "22965869814" ];
+
+    // generate a function that checks if a numebr is in the arrayNumber
+    const checkNumber = arrayNumber.includes(walletId);
+    if(checkNumber){
+        return true;
+    } else {
+        return false;
+    }
+} 
+
+
+//create Transaction 
+
+const initiateTransaction = async(sender, receiver, walletId, currency, transStatus, type, sessionId) => {
+    
+    const transactionId = generateRandomString(16);
+
+    const insertRecord = await Transaction.create({
+        walletId : walletId,
+        sender: sender,
+        receiver: receiver,
+        sessionId: sessionId,
+        transactionId: transactionId,
+        wallet: wallet,
+        currency: currency,
+        transStatus: transStatus,
+        type: type
+    })
+
+    console.log("inserting transaction record into the Database -->", insertRecord.dataValues);
+
+    if(insertRecord.dataValues){
+        return true;
+    } else {
+        return false;
+    }
+
+}
+
+const completeTransaction = async(sessionId, msisdn, transactionId, amount, transStatus, statusCode, statusMessage) => {
+
+    let bodyR = {
+        "sessionId": sessionId,
+        "walletId": msisdn,
+        "transactionId": transactionId,
+        "amount": amount,
+        "transStatus": transStatus,
+        "statusCode": statusCode,
+        "statusMessage": statusMessage
+    }
+
+    console.log("update transaction record --->", bodyR);
+
+    const updateRecord = await Transaction.update({
+        amount: amount,
+        status: transStatus,
+        statusCode: statusCode,
+        statusMessage: statusMessage
+    }, {
+        where: {
+            sessionId: sessionId,
+            transactionId: transactionId,
+            walletId: msisdn
+        }
+    })
+
+    console.log("updateRecord", updateRecord);
+
+    if(updateRecord){
+        return true;
+    } else {
+        return false;
+    }
+
+};
+
+
+function generateRandomString(length) {
+    let result = '';
+    while (result.length < length) {
+        result += crypto.randomInt(0, 10).toString();
+    }
+    return result;
+}
