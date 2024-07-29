@@ -43,7 +43,7 @@ async function validateAccountNumber(walletId, country, account) {
     }
 }
 
-async function uba2ubaTransfer(amount, sender, receiver, walletId, country, transactionId) {
+async function uba2ubaTransfer(amount, sender, receiver, walletId, country, transactionId, narration) {
 
     const service = 'uba-esb';
     const baseUrl = process.env.TELCO_SWITCH_IP;
@@ -56,7 +56,8 @@ async function uba2ubaTransfer(amount, sender, receiver, walletId, country, tran
         amount: amount,
         country: country,
         reference: transactionId,
-        fee: "0"
+        fee: "0",
+        narration: narration
     }
 
     console.log("this is the request body -->", requestBody)
@@ -78,7 +79,7 @@ async function uba2ubaTransfer(amount, sender, receiver, walletId, country, tran
 
     } catch (error) {
         // Handle any errors here
-        console.error(error);
+        console.error(error.data);
         throw error;
     }
 }
@@ -110,18 +111,41 @@ async function checkAccountBalance(account, country){
 }
 
 
-async function miniStatement(account){
+async function getMiniStatement(account, country){
     try {
-        const response = await axios.post('https://bank-core-api.com/miniStatement', {
-            account
-        }, {
+        const service = 'uba-esb'
+        const baseUrl = process.env.TELCO_SWITCH_IP
+        const endpoint = `v1/switch-bus/get-mini-statement/${country}/${service}/${account}`;
+        
+        // generate an asynchronous axios get call with the appropriate headers
+        const response = await axios.get(`${baseUrl}/${endpoint}`, {
             headers: {
-                Authorization: 'Bearer YOUR_AUTH_TOKEN'
-            }
+                'Content-Type': 'application/json',
+            },
+            timeout: 10000 // Timeout of 10 seconds (10000 milliseconds)
+
         });
 
-        // Process the response data here
-        console.log(response.data);
+        console.log("response from UBA ESB", response.data);
+
+        const responseMessage = response.data;
+
+        console.log("mini statement details", responseMessage.data.transactions)
+
+        let transactionData = responseMessage.data.transactions; // Use the slice method to get the first 5 items
+        
+        const firstFiveTransactions = transactionData.slice(0, 2);
+        
+        if((responseMessage.status == true)){
+            console.log("display first 5 transactions", firstFiveTransactions); // log the response data to the console
+
+            return firstFiveTransactions;
+
+        } else {
+            console.log("Could not get Mini-statement");
+
+            return "No Mini-statement";
+        }
     } catch (error) {
         // Handle any errors here
         console.error(error);
@@ -137,5 +161,5 @@ module.exports = {
     validateAccountNumber,
     uba2ubaTransfer,
     checkAccountBalance,
-    miniStatement
+    getMiniStatement
 }; 

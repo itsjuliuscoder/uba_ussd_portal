@@ -14,6 +14,10 @@ router.post('/incoming',
     USSDMenuController.mtnReceiver
 );
 
+router.post('/cardless_callback', 
+    USSDMenuController.callbackUrl
+)
+
 
 
 

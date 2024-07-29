@@ -5,8 +5,8 @@ const {
 
 
 module.exports = (sequelize, DataTypes) => {
-    class Transaction extends Model {
-        
+    class AirtimeDataTrans extends Model {
+
         /**
          * Associate Transaction with other models
          * @static
@@ -17,53 +17,43 @@ module.exports = (sequelize, DataTypes) => {
         }
     }
 
-    Transaction.init({
+    AirtimeDataTrans.init({
         id: {
             type: DataTypes.INTEGER,
             autoIncrement: true,
             allowNull: false,
             primaryKey: true
         },
-        walletId: {
-            type: DataTypes.STRING,
-        },
-        sender: {
-            type: DataTypes.STRING,
-        },
-        receiver: {
-            type: DataTypes.STRING,
-        },
         sessionId: {
             type: DataTypes.STRING,
-            unique: true
         },
         transactionId: {
             type: DataTypes.STRING,
-            unique: true
         },
-        amount: DataTypes.STRING,
-        currency: {
+        walletId: {
             type: DataTypes.STRING,
-            allowNull: false
+        },
+        accountNo: {
+            type: DataTypes.STRING,
+        },
+        amount: {
+            type: DataTypes.STRING,
+        },
+        country: {
+            type: DataTypes.STRING,
         },
         status: DataTypes.STRING,
+        type: DataTypes.STRING,
         statusCode: {
             type: DataTypes.STRING
         },
         statusMessage: {
             type: DataTypes.STRING
-        },
-        type: {
-            type: DataTypes.STRING,
-            allowNull: false
-        },
-        CBAReference: {
-            type: DataTypes.STRING
-        },
+        }
     }, {
         sequelize,
-        modelName: 'Transaction',
+        modelName: 'AirtimeDataTrans',
     });
 
-    return Transaction;
+    return AirtimeDataTrans;
 }
