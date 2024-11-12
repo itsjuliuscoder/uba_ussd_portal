@@ -1,4 +1,5 @@
 const axios = require('axios');
+require('dotenv/config');
 
 
 async function validateAccountNumber(walletId, country, account) {
@@ -32,7 +33,7 @@ async function validateAccountNumber(walletId, country, account) {
             return response.data;
         } else {
             console.log("Account Could Not Be Validated");
-
+            
             return "Account Could Not Be Validated";
         }
 
@@ -53,7 +54,7 @@ async function uba2ubaTransfer(amount, sender, receiver, walletId, country, tran
         fromAccount: sender,
         toAccount: receiver,
         merchantName: "USSD Merchant",
-        amount: amount,
+        amount: (amount),
         country: country,
         reference: transactionId,
         fee: "0",
@@ -61,6 +62,7 @@ async function uba2ubaTransfer(amount, sender, receiver, walletId, country, tran
     }
 
     console.log("this is the request body -->", requestBody)
+
     
 
     try {
@@ -80,7 +82,7 @@ async function uba2ubaTransfer(amount, sender, receiver, walletId, country, tran
     } catch (error) {
         // Handle any errors here
         console.error(error.data);
-        throw error;
+        //throw error;
     }
 }
 
@@ -96,7 +98,7 @@ async function checkAccountBalance(account, country){
             headers: {
                 'Content-Type': 'application/json',
             },
-            timeout: 10000 // Timeout of 10 seconds (10000 milliseconds)
+            timeout: 30000 // Timeout of 10 seconds (10000 milliseconds)
         });
 
         // Process the response data here

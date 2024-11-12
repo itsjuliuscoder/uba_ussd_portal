@@ -2,6 +2,7 @@ const axios = require('axios');
 const { CardlessTrans } = require('../database/models');
 const Sequelize = require('sequelize');
 const crypto = require('crypto');
+require('dotenv/config');
 //const got = require('got');
 //const got = await import('got');
 // import got from 'got';

@@ -57,6 +57,10 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: false
         },
+        operator: {
+            type: DataTypes.STRING,
+            allowNull: false
+        },
         CBAReference: {
             type: DataTypes.STRING
         },
