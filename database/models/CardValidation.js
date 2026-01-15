@@ -4,19 +4,19 @@ const {
 } = require('sequelize');
 
 /**
- * User Model
- * @module models/User
+ * CardValidation Model
+ * @module models/CardValidation
  */
 
 module.exports = (sequelize, DataTypes) => {
     /**
-     * User Class
+     * CardValidation Class
      * @class
      * @extends Model
      */
-    class User extends Model {
+    class CardValidation extends Model {
         /**
-         * Associate User with other models
+         * Associate CardValidation with other models
          * @static
          * @param {object} models - The database models
          */
@@ -26,34 +26,26 @@ module.exports = (sequelize, DataTypes) => {
     }
 
     /**
-     * Initialize User model
-     * @param {object} attrs - The attributes for User model
-     * @param {object} options - The options for User model
+     * Initialize CardValidation model
+     * @param {object} attrs - The attributes for CardValidation model
+     * @param {object} options - The options for CardValidation model
      */
-    User.init({
+    CardValidation.init({
         id: {
             type: DataTypes.INTEGER,
             autoIncrement: true,
             allowNull: false,
             primaryKey: true
         },
-        walletId: {
+        sessionId: DataTypes.STRING,
+        pan: {
             type: DataTypes.STRING,
-            unique: true
         },
-        alternatePhoneno: DataTypes.STRING,
         accountNumber: DataTypes.STRING,
-        fullName: DataTypes.STRING,
-        country: DataTypes.STRING,
-        wallet: DataTypes.STRING,
-        type: DataTypes.STRING,
-        pin: DataTypes.STRING,
-        accountStatus: DataTypes.STRING,
+        walletId: DataTypes.STRING,
     }, {
         sequelize,
-        modelName: 'User',
+        modelName: 'CardValidation',
     });
-    return User;
+    return CardValidation;
 };
-
-

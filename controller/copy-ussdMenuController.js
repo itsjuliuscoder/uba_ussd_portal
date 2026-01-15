@@ -6,7 +6,6 @@ const {
   Transaction,
   CardlessTrans,
   AirtimeDataTrans,
-  CardValidation,
   Operators
 } = require("../database/models");
 const {
@@ -14,7 +13,6 @@ const {
   checkAccountBalance,
   uba2ubaTransfer,
   getMiniStatement,
-  validateCardDetails
 } = require("../services/ubaServices");
 const {
   iniTransaction,
@@ -165,27 +163,27 @@ exports.moovReceiver = async (req, res, next) => {
             res.header("Content-Type", "application/xml");
             res.status(200).send(enrollAccountNoResp.text);
           } else if (userInput == "2") {
-            // if subscriber input is debit card we display screen for debit
+            // if subscriber input is prepaid account we display screen for prepaid
 
-            const enrollDebitNoResp = await enrollNewUserType(
+            const enrollPrepaidNoResp = await enrollNewUserType(
               walletId,
               lang,
               (wallet = "moov"),
               (country = "BJ"),
-              (type = "card")
+              (type = "prepaid")
             );
             step = "1";
             const insertUssdResp = await updateUssdAction(
               sessionId,
               walletId,
               (closeState = "0"),
-              enrollDebitNoResp.questionType,
+              enrollPrepaidNoResp.questionType,
               step,
-              enrollDebitNoResp.text
+              enrollPrepaidNoResp.text
             );
 
             res.header("Content-Type", "application/xml");
-            res.status(200).send(enrollDebitNoResp.text);
+            res.status(200).send(enrollPrepaidNoResp.text);
           } else if (userInput == "3") {
             const termsConditionResp = await TermsCondition(walletId, lang);
             step = "1";
@@ -271,31 +269,28 @@ exports.moovReceiver = async (req, res, next) => {
               res.status(200).send(createPinResp.text);
             }
           }
-        } else if (checkSession.questionType == "enrollUserDebitCard") {
-          const enrollDebitNoResp = await enrollNewUserDebitCard(
-            sessionId,
-            walletId,
-            lang,
-            (wallet = "moov"),
-            (country = "BJ"),
-            checkSession.steps, 
-            userInput
-          );
+        } else if (checkSession.questionType == "enrollUserPrepaid") {
+          if (checkSession.steps == "1") {
+            const enrollPrepaidNoResp = await enrollNewUserPrepaid(
+              walletId,
+              lang,
+              (wallet = "moov"),
+              (country = "BJ")
+            );
+            step = "2";
+            const insertUssdResp = await updateUssdAction(
+              sessionId,
+              walletId,
+              (closeState = "0"),
+              enrollPrepaidNoResp.questionType,
+              step,
+              enrollPrepaidNoResp.text
+            );
 
-          console.log("Debit Card Enrollment Resp --> ", enrollDebitNoResp);
-          
-          const insertUssdResp = await updateUssdAction(
-            sessionId,
-            walletId,
-            (closeState = "0"),
-            enrollDebitNoResp.questionType,
-            enrollDebitNoResp.step,
-            enrollDebitNoResp.text
-          );
-
-          res.header("Content-Type", "application/xml");
-          res.status(200).send(enrollDebitNoResp.text);
-          
+            res.header("Content-Type", "application/xml");
+            res.status(200).send(enrollNewUserRep.text);
+          } else if (checkSession.steps == "2") {
+          }
         } else if (checkSession.questionType == "userCreated") {
           if (userInput == "1") {
             //display the index menu
@@ -324,7 +319,7 @@ exports.moovReceiver = async (req, res, next) => {
           } else {
           }
         } else if (checkSession.questionType == "indexScreen") {
-          if (subscriberInput == "1") {
+          if (userInput == "1") {
             // check if the user session is still active
             const checkSession = await checkSessionId(walletId, sessionId);
             //display the index menu
@@ -332,17 +327,17 @@ exports.moovReceiver = async (req, res, next) => {
               sessionId,
               walletId,
               lang,
-              (wallet = "mtn"),
+              (wallet = "moov"),
               checkSession.steps,
               userInput
             );
-  
+
             console.log("this is the airtime response step 1 --> ", indexMenuResp);
             // step = "1";
             const insertUssdResp = await updateUssdAction(
               sessionId,
               walletId,
-              "0",
+              (closeState = "0"),
               indexMenuResp.questionType,
               indexMenuResp.step,
               indexMenuResp.text
@@ -351,8 +346,8 @@ exports.moovReceiver = async (req, res, next) => {
               res.header("Content-Type", "application/xml");
               res.status(200).send(indexMenuResp.text);
             }
-  
-          } else if (subscriberInput == "2") {
+
+          } else if (userInput == "2") {
             // check if the user session is still active
             const checkSession = await checkSessionId(walletId, sessionId);
             //display the uba2ubaTransfer
@@ -360,17 +355,17 @@ exports.moovReceiver = async (req, res, next) => {
                 sessionId,
                 walletId,
                 lang,
-                (wallet = "mtn"),
+                (wallet = "moov"),
                 checkSession.steps,
                 userInput
               );
-  
+
               
               step = "1";
               const insertUssdResp = await updateUssdAction(
                 sessionId,
                 walletId,
-                "0",
+                (closeState = "0"),
                 dataSubResp.questionType,
                 dataSubResp.step,
                 dataSubResp.text
@@ -379,7 +374,7 @@ exports.moovReceiver = async (req, res, next) => {
                 res.header("Content-Type", "application/xml");
                 res.status(200).send(dataSubResp.text);
               }
-          } else if (subscriberInput == "3") {
+          } else if (userInput == "3") {
             // check if the user session is still active
             const checkSession = await checkSessionId(walletId, sessionId);
               //display the uba2ubaTransfer
@@ -387,7 +382,7 @@ exports.moovReceiver = async (req, res, next) => {
                 sessionId,
                 walletId,
                 lang,
-                (wallet = "mtn"),
+                (wallet = "moov"),
                 checkSession.steps,
                 userInput
               );
@@ -395,7 +390,7 @@ exports.moovReceiver = async (req, res, next) => {
               const insertUssdResp = await updateUssdAction(
                 sessionId,
                 walletId,
-                "0",
+                (closeState = "0"),
                 indexMenuResp.questionType,
                 indexMenuResp.step,
                 indexMenuResp.text
@@ -404,13 +399,13 @@ exports.moovReceiver = async (req, res, next) => {
                 res.header("Content-Type", "application/xml");
                 res.status(200).send(indexMenuResp.text);
               }
-          } else if (subscriberInput == "4") {
+          } else if (userInput == "4") {
               //display the index menu
               const indexMenuResp = await fundWallet(
                 sessionId,
                 walletId,
                 lang,
-                (wallet = "mtn"),
+                (wallet = "moov"),
                 checkSession.steps,
                 userInput
               );
@@ -418,7 +413,7 @@ exports.moovReceiver = async (req, res, next) => {
               const insertUssdResp = await updateUssdAction(
                 sessionId,
                 walletId,
-                "0",
+                (closeState = "0"),
                 indexMenuResp.questionType,
                 indexMenuResp.step,
                 indexMenuResp.text
@@ -427,14 +422,41 @@ exports.moovReceiver = async (req, res, next) => {
                 res.header("Content-Type", "application/xml");
                 res.status(200).send(indexMenuResp.text);
               }
-  
-  
-          } else if (subscriberInput == "5") {
+
+
+          } else if (userInput == "5") {
+            // check if the user session is still active
+            const checkSession = await checkSessionId(walletId, sessionId);
+            //display the ATM Cardless Withdrawal
+            const getAirtimeResp = await getAirtimeTopup(
+              sessionId,
+              walletId,
+              lang,
+              (wallet = "moov"),
+              checkSession.steps,
+              userInput
+            );
+
+            console.log("this is the airtime top response --->", getAirtimeResp);
+            //update USSD action
+            const insertUssdResp = await updateUssdAction(
+              sessionId,
+              walletId,
+              (closeState = "0"),
+              getAirtimeResp.questionType,
+              getAirtimeResp.step,
+              getAirtimeResp.text
+            );
+            if (insertUssdResp == true) {
+              res.header("Content-Type", "application/xml");
+              res.status(200).send(getAirtimeResp.text);
+            }
+          } else if (userInput == "6") {
             //display the index menu
             let indexMenuResp = await miniStatement(
               walletId,
               lang,
-              (wallet = "mtn"),
+              (wallet = "moov"),
               checkSession.steps,
               userInput
             );
@@ -443,7 +465,7 @@ exports.moovReceiver = async (req, res, next) => {
             let insertUssdResp = await updateUssdAction(
               sessionId,
               walletId,
-              "0",
+              (closeState = "0"),
               indexMenuResp.questionType,
               indexMenuResp.step,
               indexMenuResp.text
@@ -453,20 +475,20 @@ exports.moovReceiver = async (req, res, next) => {
               res.status(200).send(indexMenuResp.text);
             }
             //const insertUssdResp = await
-          } else if (subscriberInput == "6") {
+          } else if (userInput == "7") {
             //display the index menu
             const indexMenuResp = await checkBalance(
               walletId,
               lang,
-              (wallet = "mtn"),
+              (wallet = "moov"),
               checkSession.steps,
               userInput
             );
-  
+
             const insertUssdResp = await updateUssdAction(
               sessionId,
               walletId,
-              "0",
+              (closeState = "0"),
               indexMenuResp.questionType,
               indexMenuResp.step,
               indexMenuResp.text
@@ -476,12 +498,33 @@ exports.moovReceiver = async (req, res, next) => {
               res.status(200).send(indexMenuResp.text);
             }
             //const insertUssdResp = await
-          } else if (subscriberInput == "7") {
+          } else if (userInput == "8") {
+            //display the index menu
+            const indexMenuResp = await pushPullAutoLinkage(
+              walletId,
+              lang,
+              (wallet = "moov")
+            );
+            //update USSD action
+            const insertUssdResp = await updateUssdAction(
+              sessionId,
+              walletId,
+              (closeState = "0"),
+              indexMenuResp.questionType,
+              indexMenuResp.step,
+              indexMenuResp.text
+            );
+            if (insertUssdResp == true) {
+              res.header("Content-Type", "application/xml");
+              res.status(200).send(indexMenuResp.text);
+            }
+            //const insertUssdResp = await
+          } else if (userInput == "10") {
             //display the index menu
             const indexMenuResp = await prepaidCardLoading(
               walletId,
               lang,
-              (wallet = "mtn"),
+              (wallet = "moov"),
               checkSession.steps,
               userInput
             );
@@ -489,7 +532,7 @@ exports.moovReceiver = async (req, res, next) => {
             const insertUssdResp = await updateUssdAction(
               sessionId,
               walletId,
-              "0",
+              (closeState = "0"),
               indexMenuResp.questionType,
               indexMenuResp.step,
               indexMenuResp.text
@@ -499,7 +542,7 @@ exports.moovReceiver = async (req, res, next) => {
               res.status(200).send(indexMenuResp.text);
             }
             //const insertUssdResp = await
-          } else if (subscriberInput == "8") {
+          } else if (userInput == "9") {
             // check if the user session is still active
             const checkSession = await checkSessionId(walletId, sessionId);
             //display the ATM Cardless Withdrawal
@@ -507,17 +550,17 @@ exports.moovReceiver = async (req, res, next) => {
               sessionId,
               walletId,
               lang,
-              (wallet = "mtn"),
+              (wallet = "moov"),
               checkSession.steps,
               userInput
             );
-  
+
             // console.log("this is the atm withdrawal response --->", cardlessResp);
             //update USSD action
             const insertUssdResp = await updateUssdAction(
               sessionId,
               walletId,
-              "0",
+              (closeState = "0"),
               cardlessResp.questionType,
               cardlessResp.step,
               cardlessResp.text
@@ -525,27 +568,6 @@ exports.moovReceiver = async (req, res, next) => {
             if (insertUssdResp == true) {
               res.header("Content-Type", "application/xml");
               res.status(200).send(cardlessResp.text);
-            }
-            //const insertUssdResp = await
-          } else if (subscriberInput == "9") {
-            //display the index menu
-            const indexMenuResp = await pushPullAutoLinkage(
-              walletId,
-              lang,
-              (wallet = "mtn")
-            );
-            //update USSD action
-            const insertUssdResp = await updateUssdAction(
-              sessionId,
-              walletId,
-              "0",
-              indexMenuResp.questionType,
-              indexMenuResp.step,
-              indexMenuResp.text
-            );
-            if (insertUssdResp == true) {
-              res.header("Content-Type", "application/xml");
-              res.status(200).send(indexMenuResp.text);
             }
             //const insertUssdResp = await
           }
@@ -967,27 +989,27 @@ exports.mtnReceiver = async (req, res, next) => {
           res.header("Content-Type", "application/xml");
           res.status(200).send(enrollAccountNoResp.text);
         } else if (subscriberInput == "2") {
-          // if subscriber input is Debit card we display screen for debit
+          // if subscriber input is prepaid account we display screen for prepaid
 
-          const enrollDebitNoResp = await enrollNewUserType(
+          const enrollPrepaidNoResp = await enrollNewUserType(
             walletId,
             lang,
             (wallet = "mtn"),
             (country = "BJ"),
-            (type = "card")
+            (type = "prepaid")
           );
           step = "1";
           const insertUssdResp = await updateUssdAction(
             sessionId,
             walletId,
             "0",
-            enrollDebitNoResp.questionType,
+            enrollPrepaidNoResp.questionType,
             step,
-            enrollDebitNoResp.text
+            enrollPrepaidNoResp.text
           );
 
           res.header("Content-Type", "application/xml");
-          res.status(200).send(enrollDebitNoResp.text);
+          res.status(200).send(enrollPrepaidNoResp.text);
         } else if (subscriberInput == "3") {
           const termsConditionResp = await TermsCondition(walletId, lang);
           step = "1";
@@ -1073,30 +1095,28 @@ exports.mtnReceiver = async (req, res, next) => {
             res.status(200).send(createPinResp.text);
           }
         }
-      } else if (checkSession.questionType == "enrollUserDebitCard") {
-        const enrollDebitCardNoResp = await enrollNewUserDebitCard(
-          sessionId,
-          walletId,
-          lang,
-          (wallet = "mtn"),
-          (country = "BJ"),
-          checkSession.steps,
-          subscriberInput
-        );
+      } else if (checkSession.questionType == "enrollUserPrepaid") {
+        if (checkSession.steps == "1") {
+          const enrollPrepaidNoResp = await enrollNewUserPrepaid(
+            walletId,
+            lang,
+            (wallet = "mtn"),
+            (country = "BJ")
+          );
+          step = "2";
+          const insertUssdResp = await updateUssdAction(
+            sessionId,
+            walletId,
+            "0",
+            enrollPrepaidNoResp.questionType,
+            step,
+            enrollPrepaidNoResp.text
+          );
 
-        console.log("Debit Card Response --> ", enrollDebitCardNoResp)
-
-        const insertUssdResp = await updateUssdAction(
-          sessionId,
-          walletId,
-          "0",
-          enrollDebitCardNoResp.questionType,
-          enrollDebitCardNoResp.step,
-          enrollDebitCardNoResp.text
-        );
-
-        res.header("Content-Type", "application/xml");
-        res.status(200).send(enrollDebitCardNoResp.text);
+          res.header("Content-Type", "application/xml");
+          res.status(200).send(enrollNewUserRep.text);
+        } else if (checkSession.steps == "2") {
+        }
       } else if (checkSession.questionType == "userCreated") {
         if (subscriberInput == "1") {
           //display the index menu
@@ -1231,6 +1251,33 @@ exports.mtnReceiver = async (req, res, next) => {
 
 
         } else if (subscriberInput == "5") {
+          // check if the user session is still active
+          const checkSession = await checkSessionId(walletId, sessionId);
+          //display the ATM Cardless Withdrawal
+          const getAirtimeResp = await getAirtimeTopup(
+            sessionId,
+            walletId,
+            lang,
+            (wallet = "mtn"),
+            checkSession.steps,
+            userInput
+          );
+
+          console.log("this is the airtime top response --->", getAirtimeResp);
+          //update USSD action
+          const insertUssdResp = await updateUssdAction(
+            sessionId,
+            walletId,
+            "0",
+            getAirtimeResp.questionType,
+            getAirtimeResp.step,
+            getAirtimeResp.text
+          );
+          if (insertUssdResp == true) {
+            res.header("Content-Type", "application/xml");
+            res.status(200).send(getAirtimeResp.text);
+          }
+        } else if (subscriberInput == "6") {
           //display the index menu
           let indexMenuResp = await miniStatement(
             walletId,
@@ -1254,7 +1301,7 @@ exports.mtnReceiver = async (req, res, next) => {
             res.status(200).send(indexMenuResp.text);
           }
           //const insertUssdResp = await
-        } else if (subscriberInput == "6") {
+        } else if (subscriberInput == "7") {
           //display the index menu
           const indexMenuResp = await checkBalance(
             walletId,
@@ -1277,7 +1324,28 @@ exports.mtnReceiver = async (req, res, next) => {
             res.status(200).send(indexMenuResp.text);
           }
           //const insertUssdResp = await
-        } else if (subscriberInput == "7") {
+        } else if (subscriberInput == "8") {
+          //display the index menu
+          const indexMenuResp = await pushPullAutoLinkage(
+            walletId,
+            lang,
+            (wallet = "mtn")
+          );
+          //update USSD action
+          const insertUssdResp = await updateUssdAction(
+            sessionId,
+            walletId,
+            "0",
+            indexMenuResp.questionType,
+            indexMenuResp.step,
+            indexMenuResp.text
+          );
+          if (insertUssdResp == true) {
+            res.header("Content-Type", "application/xml");
+            res.status(200).send(indexMenuResp.text);
+          }
+          //const insertUssdResp = await
+        } else if (subscriberInput == "10") {
           //display the index menu
           const indexMenuResp = await prepaidCardLoading(
             walletId,
@@ -1300,7 +1368,7 @@ exports.mtnReceiver = async (req, res, next) => {
             res.status(200).send(indexMenuResp.text);
           }
           //const insertUssdResp = await
-        } else if (subscriberInput == "8") {
+        } else if (subscriberInput == "9") {
           // check if the user session is still active
           const checkSession = await checkSessionId(walletId, sessionId);
           //display the ATM Cardless Withdrawal
@@ -1326,27 +1394,6 @@ exports.mtnReceiver = async (req, res, next) => {
           if (insertUssdResp == true) {
             res.header("Content-Type", "application/xml");
             res.status(200).send(cardlessResp.text);
-          }
-          //const insertUssdResp = await
-        } else if (subscriberInput == "9") {
-          //display the index menu
-          const indexMenuResp = await pushPullAutoLinkage(
-            walletId,
-            lang,
-            (wallet = "mtn")
-          );
-          //update USSD action
-          const insertUssdResp = await updateUssdAction(
-            sessionId,
-            walletId,
-            "0",
-            indexMenuResp.questionType,
-            indexMenuResp.step,
-            indexMenuResp.text
-          );
-          if (insertUssdResp == true) {
-            res.header("Content-Type", "application/xml");
-            res.status(200).send(indexMenuResp.text);
           }
           //const insertUssdResp = await
         }
@@ -1589,17 +1636,6 @@ exports.mtnReceiver = async (req, res, next) => {
   
 };
 
-
-
-exports.celtiisReceiver = async (req, res, next) => {
-
-  console.log(req.rawBody);
-  console.log(req.body);
-  console.log(req.query);
-  console.log(req.params);
-
-}
-
 /**
  * @function checkUser
  * @param {string} walletId - The walletId of the user
@@ -1653,10 +1689,10 @@ const enrollNewUserScreen = async (walletId, lang, wallet) => {
   let info = "";
   if (lang == "en") {
     info =
-      "\n1. Enroll with Account Number \n2. Enroll with Debit Card \n3. T and C \n4. Cancel\n";
+      "\n1. Enroll with Account Number \n2. Enroll with Prepaid Card \n3. T and C \n4. Cancel\n";
   } else {
     info =
-      "\n1. Inscrivez-vous avec le numéro de compte \n2. Inscrivez-vous avec une carte de débit  \n3. T and C \n4. Annuler\n";
+      "\n1. Inscrivez-vous avec le numéro de compte \n2. Inscrivez-vous avec une carte prépayée \n3. T and C \n4. Annuler\n";
   }
 
   const text = await buildResponseText(walletId, info, wallet);
@@ -1781,7 +1817,7 @@ const indexMenu = async (walletId, lang, wallet) => {
   let info = "";
   if (lang == "en") {
     info =
-      "\n1. Buy Airtime \n2. Buy Data  \n3. UBA to UBA Transfer \n4. Fund Mobile Wallet \n5. Mini Statement \n6. Check Balance \n7. Prepaid Card Funding \n8. Cardless Withdrawal";
+      "\n1. Buy Airtime \n2. Buy Data  \n3. UBA to UBA Transfer \n4. Fund Mobile Wallet \n5. Get Airtime \n6. Mini Statement \n7. Check Balance \n8. Prepaid Card Funding \n9. Cardless Withdrawal \n10. Push & Pull Auto Linkage MTN and Moov \n11. Next \n";
     //info = "\nWelcome to UBA USSD Banking.\nPlease note a network charge will be applied to your account for banking services on this channel. \n1. Accept \n2. Cancel\n"
   } else {
     info =
@@ -1962,115 +1998,50 @@ const enrollNewUserAccount = async (
 
   let fullName = validate.data.accountInfo.accountName;
 
-  // let phoneNo = "2290195521010"; // validate.data.accountInfo.accountName;
-
   if (validate.status == true) {
+    let info = "";
+    if (lang == "en") {
+      info = `\n ${fullName} \n1. Confirm Details\n 2. Cancel\n`;
+    } else {
+      info = `\n ${fullName} \n1. Veuillez entrer votre numéro de compte\n 2. Annuler\n`;
+    }
 
-    // check if phone is on the account 
-    /*if(phoneNo == walletId){
+    const insertAccount = await insertNewUser(
+      walletId,
+      wallet,
+      country,
+      (type = "account"),
+      fullName,
+      account
+    );
 
-      let info = "";
-      if (lang == "en") {
-        info = `\n ${fullName} \n1. Confirm Details\n 2. Cancel\n`;
-      } else {
-        info = `\n ${fullName} \n1. Veuillez entrer votre numéro de compte\n 2. Annuler\n`;
-      }
+    console.log("this is insert query ---> ", insertAccount);
 
-      const insertAccount = await insertNewUser(
-        walletId,
-        wallet,
-        country,
-        (type = "account"),
-        fullName,
-        account
-      );
-
-      console.log("this is insert query ---> ", insertAccount);
-
-      if (insertAccount == true) {
-        const text = await buildResponseText(walletId, info, wallet);
-        const questionType = "enrollUserAccount";
-        const res = { text, questionType };
-        return res;
-      } else {
-
-        let info = "";
-        if (lang == "en") {
-          info = "\nAn Error Occured\n";
-        } else {
-          info = "\nAn Error Occured\n";
-        }
-
-        const text = await buildResponseTextClose(walletId, info, wallet);
-        const questionType = "enrollUserAccount";
-        const res = { text, questionType };
-        return res;
-
-      }
-
-      
-    }*/
-    // else return phone number & account mismatch
-    /*else {
+    if (insertAccount == true) {
+      const text = await buildResponseText(walletId, info, wallet);
+      const questionType = "enrollUserAccount";
+      const res = { text, questionType };
+      return res;
+    } else {
 
       let info = "";
       if (lang == "en") {
-        info = "\nAccount Number and Phone Number Mismatch\n";
+        info = "\nAn Error Occured\n";
       } else {
-        info = "\nNuméro de compte invalide\n";
+        info = "\nAn Error Occured\n";
       }
-  
+
       const text = await buildResponseTextClose(walletId, info, wallet);
       const questionType = "enrollUserAccount";
       const res = { text, questionType };
       return res;
 
-    }*/
 
-    let info = "";
-      if (lang == "en") {
-        info = `\n ${fullName} \n1. Confirm Details\n 2. Cancel\n`;
-      } else {
-        info = `\n ${fullName} \n1. Veuillez entrer votre numéro de compte\n 2. Annuler\n`;
-      }
-
-      const insertAccount = await insertNewUser(
-        walletId,
-        wallet,
-        country,
-        (type = "account"),
-        fullName,
-        account
-      );
-
-      console.log("this is insert query ---> ", insertAccount);
-
-      if (insertAccount == true) {
-        const text = await buildResponseText(walletId, info, wallet);
-        const questionType = "enrollUserAccount";
-        const res = { text, questionType };
-        return res;
-      } else {
-
-        let info = "";
-        if (lang == "en") {
-          info = "\nAn Error Occured\n";
-        } else {
-          info = "\nAn Error Occured\n";
-        }
-
-        const text = await buildResponseTextClose(walletId, info, wallet);
-        const questionType = "enrollUserAccount";
-        const res = { text, questionType };
-        return res;
-
-      }
-
-    
+    }
   } else {
     let info = "";
     if (lang == "en") {
-      info = "\nError occured. Try Again Later\n";
+      info = "\nInvalid Account Number\n";
     } else {
       info = "\nNuméro de compte invalide\n";
     }
@@ -2082,232 +2053,8 @@ const enrollNewUserAccount = async (
   }
 };
 
-
 /**
- * @function TermsCondition
- * @param {string} walletId - The walletId of the user
- * @param {string} lang - The language of the user
- * @returns {object} - The response object to be sent to the user
- * @description - This function returns the terms and condition screen for the user
- * @example
- * TermsCondition(walletId, lang);
- * @returns {object} - The response object to be sent to the user
- */
-const enrollNewUserDebitCard = async (
-  sessionId,
-  walletId,
-  lang,
-  wallet,
-  country,
-  step,
-  userInput
-) => {
-  
-  if(step == 1) {
-
-    console.log("I got here Debit Card");
-    console.log(`
-    walletId: ${walletId},
-    lang: ${lang},
-    wallet: ${wallet},
-    country: ${country},
-    step: ${step},
-    userInput: ${userInput}
-      `)
-
-    // insert into card validation table
-    const insertCardValidation = await CardValidation.create({
-      sessionId: sessionId,
-      walletId: walletId,
-      pan: userInput,
-      accountNumber: "",
-    });
-
-    console.log("Card Validation Insert Status", insertCardValidation);
-    // request for account number
-
-    let info = "";
-    if (lang == "en") {
-        info = `\n Enter Your Account Number \n 0. Cancel\n`;
-    } else {
-        info = `\n Entrez votre numéro de compte \n 0. Annuler\n`;
-    }
-
-    step = "2"
-    
-    const text = await buildResponseText(walletId, info, wallet);
-    const questionType = "enrollUserDebitCard";
-    const res = { text, questionType, step };
-    return res;
-    
-  } else if(step == 2) {
-
-    const insertAccount = await insertNewUser(
-      walletId,
-      wallet,
-      country= "BJ",
-      (type = "card"),
-      fullName = "",
-      userInput
-    );
-
-    console.log("this is insert query ---> ", insertAccount);
-
-    // add an alternate phone number 
-
-    // request for account number
-
-    console.log("I got here pls for alternate phoneno");
-
-    let info = "";
-    if (lang == "en") {
-        info = `\n Enter Your Alternate Phone Number \n 0. Cancel\n`;
-    } else {
-        info = `\n Entrez votre numéro de téléphone alternatif \n 0. Annuler\n`;
-    }
-
-    step = "3"
-    
-    const text = await buildResponseText(walletId, info, wallet);
-    const questionType = "enrollUserDebitCard";
-    const res = { text, questionType, step };
-    return res;
-     
-
-  } else if(step == 3) {
-    
-    // complete validation 
-
-    console.log("this is the alternate phone number --> ", userInput);
-
-    // make call to the ESB to validate the debit card
-    // const validate = await validateCardDetails(pan, account, phone);
-
-    const status = true;
-
-    if(status == true){
-
-      let fullName = "John Doe Test"; // validate.data.accountInfo.accountName;
-      // let info = "";
-      if (lang == "en") {
-        info = `\n ${fullName} \n1. Confirm Details\n 2. Cancel\n`;
-      } else {
-        info = `\n ${fullName} \n1. Veuillez entrer votre numéro de compte\n 2. Annuler\n`;
-      }
-
-      const updateUser = await User.update(
-        { alternatePhoneno: userInput },
-        { where: { walletId: walletId } }
-      );
-
-      console.log("this is the update query ---> ", updateUser);
-
-      step = "4"
-
-      if (updateUser == true) {
-        const text = await buildResponseText(walletId, info, wallet);
-        const questionType = "enrollUserDebitCard";
-        const res = { text, questionType, step };
-        return res;
-      } else {
-
-        let info = "";
-        if (lang == "en") {
-          info = "\nAn Error Occured\n";
-        } else {
-          info = "\nAn Error Occured\n";
-        }
-
-        const text = await buildResponseTextClose(walletId, info, wallet);
-        const questionType = "enrollUserDebitCard";
-        const res = { text, questionType, step };
-        return res;
-
-      }
-      
-      // Customer to create PIN
-
-
-    } else {
-
-      // 
-
-    }
-
-    console.log("this is the response from UBA ESB --->", validate);
-
-  } else if(step == 4) {
-      
-    if(userInput == 1) {
-      console.log(`Just to confirm the user input --> ${userInput}`);
-      // confirm details
-      let info = "";
-      if (lang == "en") {
-        info = "\nCreate a New 4-digit Pin for your USSD Menu\n";
-      } else {
-        info = "\nCréez un nouveau code PIN à 4 chiffres pour votre menu USSD\n";
-      }
-
-      console.log("I got here pls for create pin");
-
-      step = "5"
-  
-      const text = await buildResponseText(walletId, info, wallet);
-      const questionType = "enrollUserDebitCard";
-      const res = { text, questionType, step };
-      return res;
-    }
-  } else if(step == 5) {
-    // create pin
-    let info = "";
-    const userPin = await encryptPin(userInput);
-  
-    const updateUser = await User.update(
-      {
-        pin: userPin,
-      },
-      {
-        where: {
-          walletId: walletId,
-        },
-      }
-    );
-  
-    if (updateUser) {
-      if (lang == "en") {
-        info =
-          "\Debit Card Enrollment Success!!! \nYour Pin has been successfully created\n 1. Go to Main Menu\n 2. Cancel\n";
-      } else {
-        info =
-          "\nInscription du compte réussie !!! \nVotre épingle a été créée avec succès\n 1. Aller au menu principal\n 2. Annuler\n";
-      }
-  
-      const text = await buildResponseText(walletId, info, wallet);
-      const questionType = "enrollUserDebitCard";
-      const res = { text, questionType };
-      return res;
-    }
-    
-    if (lang == "en") {
-      info = "\nPin Created Successfully\n";
-    } else {
-      info = "\nPin Created Successfully\n";
-    }
-
-    step = "6"
-
-    const text = await buildResponseTextClose(walletId, info, wallet);
-    const questionType = "enrollUserDebitCard";
-    const res = { text, questionType, step };
-    return res;
-  }
-
-
-
-};
-
-/**
- * @function enrollNewUserDebitCard
+ * @function enrollNewUserPrepaid
  * @param {string} walletId - The walletId of the user
  * @param {string} lang - The language of the user
  * @param {string} wallet - The wallet of the user
@@ -2322,8 +2069,7 @@ const enrollNewUserType = async (walletId, lang, wallet, country, type) => {
   if (type == "account") {
     let info = "";
     if (lang == "en") {
-      info = `\nEnter Account Number \n0 to Cancel`;
-      // info = "\nPlease enter your Account Number\n 0 to Cancel\n";
+      info = "\nPlease enter your Account Number\n 0 to Cancel\n";
     } else {
       info = "\nVeuillez entrer votre numéro de compte\n 0 pour annuler\n";
     }
@@ -2345,21 +2091,7 @@ const enrollNewUserType = async (walletId, lang, wallet, country, type) => {
     const questionType = "enrollUserPrepaid";
     const res = { text, questionType };
     return res;
-  } else if (type == "card") {
-    let info = "";
-    if (lang == "en") {
-      info = "\nPlease enter your Debit Card Last 6 Digits\n 0 to Cancel\n";
-    } else {
-      info =
-        "\nVeuillez saisir les 6 derniers chiffres de votre carte de débit \n 0 pour annuler\n";
-    }
-
-    const text = await buildResponseText(walletId, info, wallet);
-    const questionType = "enrollUserDebitCard";
-    const res = { text, questionType };
-    return res;
   }
-
 };
 
 // generate a JSDoc for the function insertNewUser
@@ -2392,7 +2124,6 @@ const insertNewUser = async (
     },
     defaults: {
       walletId: walletId,
-      alternatePhoneno: "",
       wallet: wallet,
       country: country,
       type: type,
@@ -3359,7 +3090,7 @@ const checkBalance = async (walletId, lang, wallet, step, subscriberInput) => {
           (country = "BENIN-REPUBLIC")
         );
 
-        if ((checkBal != null) && (checkBal.data.status == true)) {
+        if (checkBal.data.status == true) {
           let amount = parseInt(checkBal.data.availableBalance);
 
           console.log("this is the available balance", amount);
@@ -4128,13 +3859,10 @@ const getCardlessTransactionDetails = async (sessionId) => {
 const checkPhoneNumber = async (walletId) => {
   const arrayNumber = [
     "2294792712",
-    "2290195521010",
-    "2290194015002",
+    "22995521010",
     "2294792799",
-    "2299522872",
-    "2290195814235",
+    "22995228720",
     "22965869814",
-    "2290194128418",
   ];
 
   // generate a function that checks if a numebr is in the arrayNumber
