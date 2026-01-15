@@ -6,8 +6,10 @@ import { Admin } from '../../types/auth';
 const staticAdmin: Admin = {
   id: 1,
   username: 'admin',
-  email: 'jane@example.com',
+  email: 'admin@example.com',
+  password: 'password',
   role: 'admin',
+  isActive: true,
   lastLogin: new Date().toISOString(),
 };
 
@@ -15,7 +17,7 @@ export function mockLogin(usernameOrEmail: string, password: string): Promise<{ 
   const mode = getMockMode();
   if (mode === 'off') return Promise.resolve(null);
   if (mode === 'static') {
-    if ((usernameOrEmail === staticAdmin.email || usernameOrEmail === staticAdmin.username) && password === 'password') {
+    if ((usernameOrEmail === staticAdmin.email || usernameOrEmail === staticAdmin.username) && password === staticAdmin.password) {
       return Promise.resolve({
         token: 'mock-token',
         admin: staticAdmin,
@@ -31,7 +33,9 @@ export function mockLogin(usernameOrEmail: string, password: string): Promise<{ 
         id: Math.floor(Math.random() * 1000),
         username: usernameOrEmail,
         email: `${usernameOrEmail}@mock.com`,
+        password: 'password',
         role: 'admin',
+        isActive: true,
         lastLogin: new Date().toISOString(),
       },
     });

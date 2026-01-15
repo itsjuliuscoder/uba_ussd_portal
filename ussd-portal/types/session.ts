@@ -2,8 +2,8 @@ export interface UssdSession {
   id: number;
   walletId: string;
   sessionId: string;
-  questionType?: string;
-  wallet?: string;
+  questionType: string;
+  wallet: string;
   closeState?: string;
   items?: string;
   steps?: string;

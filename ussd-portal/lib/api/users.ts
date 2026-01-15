@@ -1,4 +1,5 @@
 
+
 import apiClient from "./client";
 import { ApiResponse, PaginatedResponse } from "@/types/api";
 import { User, UserListParams, ResetPinParams } from "@/types/user";
@@ -15,10 +16,13 @@ export const usersApi = {
       return {
         success: true,
         data: {
-          items: users,
-          total: users.length,
-          page: 1,
-          pageSize: users.length,
+          data: users,
+          pagination: {
+            total: users.length,
+            page: 1,
+            limit: users.length,
+            totalPages: 1,
+          },
         },
         message: 'Mock user list',
       };
@@ -31,11 +35,22 @@ export const usersApi = {
   },
 
   getById: async (id: number) => {
+    if (getMockMode() !== 'off') {
+      const user = getMockUsers().find(u => u.id === id);
+      return {
+        success: !!user,
+        data: { user },
+        message: user ? 'Mock user found' : 'Mock user not found',
+      };
+    }
     const response = await apiClient.get<ApiResponse<{ user: User }>>(
       `/users/${id}`
     );
     return response.data;
   },
+
+
+
 
   getByWalletId: async (walletId: string) => {
     const response = await apiClient.get<ApiResponse<{ user: User }>>(

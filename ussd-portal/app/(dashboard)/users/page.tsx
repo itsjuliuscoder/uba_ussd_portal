@@ -127,7 +127,6 @@ export default function UsersPage() {
                 <TableHead>Account Number</TableHead>
                 <TableHead>Wallet</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Country</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -155,7 +154,6 @@ export default function UsersPage() {
                     <TableCell>{user.accountNumber || "N/A"}</TableCell>
                     <TableCell>{user.wallet || "N/A"}</TableCell>
                     <TableCell>{getStatusBadge(user.accountStatus)}</TableCell>
-                    <TableCell>{user.country || "N/A"}</TableCell>
                     <TableCell>{formatDate(user.createdAt)}</TableCell>
                     <TableCell className="text-right">
                       <UserActions user={user} />

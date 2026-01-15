@@ -14,16 +14,26 @@ export const sessionsApi = {
   list: async (params?: SessionListParams) => {
     if (getMockMode() !== 'off') {
       const sessions = getMockSessions();
-      return {
+      const page = params?.page || 1;
+      const limit = params?.limit || 20;
+      const total = sessions.length;
+      const totalPages = Math.ceil(total / limit);
+      const pagedSessions = sessions.slice((page - 1) * limit, page * limit);
+      const response = {
         success: true,
         data: {
-          items: sessions,
-          total: sessions.length,
-          page: 1,
-          pageSize: sessions.length,
+          data: pagedSessions,
+          pagination: {
+            total,
+            page,
+            limit,
+            totalPages,
+          },
         },
         message: 'Mock session list',
       };
+      console.log('[MOCK] sessionsApi.list response:', response);
+      return response;
     }
     const response = await apiClient.get<
       ApiResponse<PaginatedResponse<UssdSession>>
@@ -32,6 +42,14 @@ export const sessionsApi = {
   },
 
   getById: async (sessionId: string) => {
+    if (getMockMode() !== 'off') {
+      const session = getMockSessions().find(s => s.sessionId === sessionId);
+      return {
+        success: !!session,
+        data: { session },
+        message: session ? 'Mock session found' : 'Mock session not found',
+      };
+    }
     const response = await apiClient.get<ApiResponse<{ session: UssdSession }>>(
       `/ussd-sessions/${sessionId}`
     );

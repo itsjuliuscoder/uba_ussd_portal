@@ -15,13 +15,21 @@ export const transactionsApi = {
   list: async (params?: TransactionListParams) => {
     if (getMockMode() !== 'off') {
       const transactions = getMockTransactions();
+      const page = params?.page || 1;
+      const limit = params?.limit || 20;
+      const total = transactions.length;
+      const totalPages = Math.ceil(total / limit);
+      const pagedTransactions = transactions.slice((page - 1) * limit, page * limit);
       return {
         success: true,
         data: {
-          items: transactions,
-          total: transactions.length,
-          page: 1,
-          pageSize: transactions.length,
+          data: pagedTransactions,
+          pagination: {
+            total,
+            page,
+            limit,
+            totalPages,
+          },
         },
         message: 'Mock transaction list',
       };
@@ -33,6 +41,14 @@ export const transactionsApi = {
   },
 
   getById: async (id: number) => {
+    if (getMockMode() !== 'off') {
+      const transaction = getMockTransactions().find(t => t.id === id);
+      return {
+        success: !!transaction,
+        data: { transaction },
+        message: transaction ? 'Mock transaction found' : 'Mock transaction not found',
+      };
+    }
     const response = await apiClient.get<
       ApiResponse<{ transaction: Transaction }>
     >(`/transactions/${id}`);

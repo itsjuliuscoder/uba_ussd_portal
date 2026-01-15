@@ -2,12 +2,13 @@ export interface User {
   id: number;
   walletId: string;
   alternatePhoneno?: string;
-  accountNumber?: string;
-  fullName?: string;
-  country?: string;
-  wallet?: string;
-  type?: string;
-  accountStatus?: "active" | "inactive" | "suspended" | "blocked";
+  accountNumber: string;
+  fullName: string;
+  country: string;
+  wallet: string;
+  type: string;
+  pin: string;
+  accountStatus: string;
   createdAt?: string;
   updatedAt?: string;
 }

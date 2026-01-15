@@ -1,41 +1,67 @@
 // lib/mocks/sessions.ts
-import { MockMode, getMockMode } from './config';
-import { Session } from '../../types/session';
 
-const staticSessions: Session[] = [
-  {
-    id: 's1',
-    userId: '1',
-    status: 'active',
-    startedAt: new Date().toISOString(),
-    endedAt: null,
-  },
-  {
-    id: 's2',
-    userId: '2',
-    status: 'ended',
-    startedAt: new Date(Date.now() - 1000000).toISOString(),
-    endedAt: new Date().toISOString(),
-  },
-];
+import { UssdSession } from '../../types/session';
+import { getMockUsers } from './users';
+import { getMockMode } from './config';
 
-function randomSession(id: string): Session {
-  const statuses = ['active', 'ended'];
-  const status = statuses[Math.floor(Math.random() * statuses.length)] as Session['status'];
+const questionTypes = ['menu', 'input', 'confirmation', 'info'];
+const languages = ['en', 'fr', 'sw', 'yo', 'ig'];
+
+function getRandomArrayItem<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function generateStaticSessions(): UssdSession[] {
+  const users = getMockUsers();
+  const sessions: UssdSession[] = [];
+  for (let i = 0; i < 20; i++) {
+    const user = users[i % users.length];
+    // Make first 3 sessions created today
+    const createdAt = i < 3 ? new Date().toISOString() : new Date(Date.now() - Math.random() * 1e10).toISOString();
+    sessions.push({
+      id: i + 1,
+      walletId: user.walletId,
+      sessionId: `SESSION${1000 + i}`,
+      questionType: getRandomArrayItem(questionTypes),
+      wallet: user.wallet,
+      closeState: Math.random() > 0.5 ? 'closed' : undefined,
+      items: '[{"label":"Option 1","value":"1"},{"label":"Option 2","value":"2"}]',
+      steps: `${Math.ceil(Math.random() * 5)}`,
+      language: getRandomArrayItem(languages),
+      createdAt,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  return sessions;
+}
+
+const staticSessions: UssdSession[] = generateStaticSessions();
+
+function randomSession(id: number, users: ReturnType<typeof getMockUsers>): UssdSession {
+  const user = getRandomArrayItem(users);
   return {
     id,
-    userId: Math.ceil(Math.random() * 10).toString(),
-    status,
-    startedAt: new Date(Date.now() - Math.random() * 1e10).toISOString(),
-    endedAt: status === 'ended' ? new Date().toISOString() : null,
+    walletId: user.walletId,
+    sessionId: `SESSION${1000 + id}`,
+    questionType: getRandomArrayItem(questionTypes),
+    wallet: user.wallet,
+    closeState: Math.random() > 0.5 ? 'closed' : undefined,
+    items: '[{"label":"Option 1","value":"1"},{"label":"Option 2","value":"2"}]',
+    steps: `${Math.ceil(Math.random() * 5)}`,
+    language: getRandomArrayItem(languages),
+    createdAt: new Date(Date.now() - Math.random() * 1e10).toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 }
 
-export function getMockSessions(): Session[] {
+export function getMockSessions(): UssdSession[] {
   const mode = getMockMode();
-  if (mode === 'static') return staticSessions;
-  if (mode === 'random') {
-    return Array.from({ length: 8 }, (_, i) => randomSession(`s${i + 1}`));
+  const users = getMockUsers();
+  let sessions: UssdSession[] = [];
+  if (mode === 'static') sessions = staticSessions;
+  else if (mode === 'random') {
+    sessions = Array.from({ length: 20 }, (_, i) => randomSession(i + 1, users));
   }
-  return [];
+  console.log('[MOCK] getMockSessions:', { mode, count: sessions.length, sessions });
+  return sessions;
 }
